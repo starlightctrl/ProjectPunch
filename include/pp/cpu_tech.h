@@ -27,6 +27,7 @@ class CpuTechState {
 public:
     CpuTechState() {
         modules = NULL;
+        techCheck = false;
         lyingDown = false;
         tech = 0;
         getup = 0;
@@ -37,6 +38,7 @@ public:
 
     // Set while the CPU is falling or lying down, for techValueHook to find it.
     soModuleAccesser* modules;
+    bool techCheck;
     bool lyingDown;
     int tech;
     int getup;

@@ -18,8 +18,12 @@
  * window, and the lockout from pressing shield too often is over. The tech is a roll if the stick
  * is held to the side. Lying down, the stick to the side is a getup roll and up is standing up.
  * Either roll then goes the way stick X points, where positive is the way the fighter is facing.
+ *
+ * After a trip (SlipWait), getups check stick X for the forward roll, 1012 for the back roll and
+ * stick Y for standing up, without asking about the side stick first.
  */
 #define IC_STICK_X 1011
+#define IC_STICK_X_BACK 1012
 #define IC_STICK_SIDE 1013
 #define IC_STICK_Y 1018
 #define IC_FRAMES_SINCE_SHIELD 21017
@@ -38,12 +42,21 @@ const char* cpuTechOptions[] = { "Off", "Random", "Random (No Miss)", "Away", "I
 enum TechChoice { TECH_NEUTRAL, TECH_AWAY, TECH_IN, TECH_MISS };
 enum GetupChoice { GETUP_STAND, GETUP_AWAY, GETUP_IN, GETUP_ATTACK };
 
+static bool isTripping(int action) {
+    return action == ACTION_SLIP || action == ACTION_SLIPTURN || action == ACTION_SLIPDASH;
+}
+
+static bool isTripLyingDown(int action) {
+    return action == ACTION_SLIPDOWN || action == ACTION_SLIPWAIT;
+}
+
+// Tripping counts as falling: P+ makes trips techable when the CPU lands.
 static bool isFalling(int action) {
-    return action == ACTION_HITSTUN || action == ACTION_DAMAGEFALL;
+    return action == ACTION_HITSTUN || action == ACTION_DAMAGEFALL || isTripping(action);
 }
 
 static bool isLyingDown(int action) {
-    return action == ACTION_HITGROUNDTUMBLE || action == ACTION_DOWNWAIT;
+    return action == ACTION_HITGROUNDTUMBLE || action == ACTION_DOWNWAIT || isTripLyingDown(action);
 }
 
 /* 1 if the closest other fighter is to the right of x, -1 if to the left. */
@@ -89,28 +102,44 @@ void processCpuTech(PlayerData& player) {
     u16 action = player.current->action;
     u16 prevAction = player.prev->action;
 
-    if (isFalling(action)) {
-        // Hitstun -> DamageFall is the same fall.
-        if (!isFalling(prevAction)) {
-            state.tech = pickTech(option);
-        }
-    } else if (isLyingDown(action)) {
+    if (!isFalling(action) && !isLyingDown(action)) { return; }
+
+    /*
+     * A trip that doesn't send the CPU flying (Squirtle's down B) goes straight to SlipDown, which
+     * checks for a tech every frame and then for getups at its end. So it's both.
+     */
+    bool techCheck = isFalling(action) || action == ACTION_SLIPDOWN;
+    if (techCheck && !isFalling(prevAction) && prevAction != ACTION_SLIPDOWN) {
+        // Hitstun -> DamageFall and Slip -> SlipDown are the same fall.
+        state.tech = pickTech(option);
+    }
+
+    if (isLyingDown(action)) {
         if (!isLyingDown(prevAction)) {
             state.getup = randi(4);
         }
 
         // The getup attack is a button press, which the game doesn't ask techValueHook about.
-        if (action == ACTION_DOWNWAIT && state.getup == GETUP_ATTACK) {
-            modules.getStatusModule()->changeStatus(ACTION_DOWNATTACK, &modules);
+        if (state.getup == GETUP_ATTACK) {
+            if (action == ACTION_DOWNWAIT) {
+                modules.getStatusModule()->changeStatus(ACTION_DOWNATTACK, &modules);
+            } else if (action == ACTION_SLIPWAIT) {
+                modules.getStatusModule()->changeStatus(ACTION_SLIPATTACK, &modules);
+            }
         }
-    } else {
-        return;
     }
 
     state.modules = &modules;
+    state.techCheck = techCheck;
     state.lyingDown = isLyingDown(action);
     soPostureModule* posture = modules.getPostureModule();
     state.opponentDirection = directionToOpponent(player, posture->getPos().m_x) * posture->getLr();
+
+    // Trip getups don't ask about the side stick first, so set the roll direction up front.
+    if (isTripLyingDown(action)) {
+        if (state.getup == GETUP_IN) { state.rollStick = state.opponentDirection; }
+        if (state.getup == GETUP_AWAY) { state.rollStick = -state.opponentDirection; }
+    }
 }
 
 float (*techValueOriginal)(soModuleAccesser* modules, u32 index, u32 arg);
@@ -122,7 +151,7 @@ float (*techValueOriginal)(soModuleAccesser* modules, u32 index, u32 arg);
  */
 float techValueHook(soModuleAccesser* modules, u32 index, u32 arg) {
     float value = techValueOriginal(modules, index, arg);
-    if (index != IC_STICK_X && index != IC_STICK_SIDE && index != IC_STICK_Y
+    if (index != IC_STICK_X && index != IC_STICK_X_BACK && index != IC_STICK_SIDE && index != IC_STICK_Y
         && index != IC_FRAMES_SINCE_SHIELD && index != IC_TECH_LOCKOUT) { return value; }
     if (allPlayerData == NULL || !battleSceneInitialized) { return value; }
 
@@ -136,31 +165,38 @@ float techValueHook(soModuleAccesser* modules, u32 index, u32 arg) {
     bool rollAway;
     switch (index) {
         case IC_FRAMES_SINCE_SHIELD:
-            if (state->lyingDown) { return value; }
+            if (!state->techCheck) { return value; }
             state->checkingTech = state->tech != TECH_MISS;
             return state->checkingTech ? TECH_FRAMES_SINCE_SHIELD : MISS_FRAMES_SINCE_SHIELD;
 
         case IC_TECH_LOCKOUT:
-            return state->lyingDown ? value : TECH_LOCKOUT_OVER;
+            return state->techCheck ? TECH_LOCKOUT_OVER : value;
 
         case IC_STICK_SIDE:
-            if (state->lyingDown) {
+            if (state->checkingTech) {
+                state->checkingTech = false;
+                rollIn = state->tech == TECH_IN;
+                rollAway = state->tech == TECH_AWAY;
+            } else if (state->lyingDown) {
                 rollIn = state->getup == GETUP_IN;
                 rollAway = state->getup == GETUP_AWAY;
             } else {
                 // The stick is read for other things during a fall too, so only answer for the tech.
-                if (!state->checkingTech) { return value; }
-                state->checkingTech = false;
-                rollIn = state->tech == TECH_IN;
-                rollAway = state->tech == TECH_AWAY;
+                return value;
             }
             if (rollIn) { state->rollStick = state->opponentDirection; }
             if (rollAway) { state->rollStick = -state->opponentDirection; }
             return rollIn || rollAway ? 1.0f : 0.0f;
 
         case IC_STICK_X:
-            // Asked right after a roll starts, for which way it goes.
+            // Asked right after a roll starts, for which way it goes. Trip getups check it for
+            // the forward roll.
             return state->rollStick != 0 ? state->rollStick : value;
+
+        case IC_STICK_X_BACK:
+            // Trip getups check this one for the back roll.
+            if (!state->lyingDown || state->rollStick == 0) { return value; }
+            return -state->rollStick;
 
         default:
             if (!state->lyingDown) { return value; }
