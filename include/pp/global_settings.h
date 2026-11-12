@@ -22,6 +22,7 @@ public:
     bool enableLedgeTechFrameDisplay;
     bool enableLedgeTechFramesOnLedgePopup;
     bool enableLedgeTechAirdodgeAngle;
+    int cpuTechOption;
 
     void print();
 };

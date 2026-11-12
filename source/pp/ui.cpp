@@ -8,6 +8,7 @@
 
 #include "pp/collections/linkedlist.h"
 #include "pp/common.h"
+#include "pp/cpu_tech.h"
 #include "pp/input/pad.h"
 #include "pp/menu/menu.h"
 #include "pp/menu/options/bool_option.h"
@@ -86,6 +87,9 @@ void PpunchMenu::init() {
         newPage.addOption(new BoolOption("Dash Overlay", playerSettings.enableDashOverlay));
         newPage.addOption(new BoolOption("IASA Overlay", playerSettings.enableIasaOverlay));
         newPage.addOption(new BoolOption("Show Fighter State", playerSettings.showFighterState));
+        if (player.isCpu) {
+            newPage.addOption(new ChoiceOption("CPU Tech", cpuTechOptions, playerSettings.cpuTechOption, PP_CPU_TECH_OPT_COUNT));
+        }
         newPage.addOption(new SpacerOption());
 
         /*

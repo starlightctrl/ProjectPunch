@@ -4,6 +4,7 @@
 #include "OS/OSThread.h"
 
 #include "pp/common.h"
+#include "pp/cpu_tech.h"
 
 namespace PP {
 
@@ -30,6 +31,7 @@ PlayerSettings::PlayerSettings() {
     enableLedgeTechFramesOnLedgePopup = false;
     enableLedgeTechGalintPopup = false;
     enableLedgeTechAirdodgeAngle = false;
+    cpuTechOption = CPU_TECH_OFF;
 }
 
 bool GlobalSettings::readGlobalSettings(const char* filepath) {
@@ -91,6 +93,10 @@ bool GlobalSettings::readGlobalSettings(const char* filepath) {
         this->playerSettings[i].enableLedgeTechFrameDisplay = *dataBools++;
         this->playerSettings[i].enableLedgeTechFramesOnLedgePopup = *dataBools++;
         this->playerSettings[i].enableLedgeTechAirdodgeAngle = *dataBools++;
+        this->playerSettings[i].cpuTechOption = *(u8*)dataBools++;
+        if (this->playerSettings[i].cpuTechOption >= PP_CPU_TECH_OPT_COUNT) {
+            this->playerSettings[i].cpuTechOption = CPU_TECH_OFF; // Older settings files.
+        }
     }
 
     handle.release();
@@ -137,6 +143,7 @@ bool GlobalSettings::writeGlobalSettings(const char* filepath) {
         *boolBufferPos++ = this->playerSettings[i].enableLedgeTechFrameDisplay;
         *boolBufferPos++ = this->playerSettings[i].enableLedgeTechFramesOnLedgePopup;
         *boolBufferPos++ = this->playerSettings[i].enableLedgeTechAirdodgeAngle;
+        *(u8*)boolBufferPos++ = this->playerSettings[i].cpuTechOption;
 
         if ((bytesInBuffer = (u32)boolBufferPos - (u32)boolBufferPosStart) > 0x20) {
             OSReport("PPunch Settings save for player %d too long: %d bytes\n", i+1, bytesInBuffer);
@@ -165,9 +172,10 @@ void GlobalSettings::print() {
 void PlayerSettings::print() {
     OSReport(
         "  PlayerOptions: \n\tonHit: %d onShield: %d ooLag: %d showState: %d waitOvr: %d dashOvr: %d iasaOvr: %d\n\t"
-        "ltgalint: %d ltviz : %d ltlframes : %d ltairdodge : %d\n",
+        "ltgalint: %d ltviz : %d ltlframes : %d ltairdodge : %d cputech : %d\n",
         showOnHitAdvantage, showOnShieldAdvantage, showActOutOfLag, showFighterState, enableWaitOverlay, enableDashOverlay, enableIasaOverlay,
-        enableLedgeTechGalintPopup, enableLedgeTechFrameDisplay, enableLedgeTechFramesOnLedgePopup, enableLedgeTechAirdodgeAngle
+        enableLedgeTechGalintPopup, enableLedgeTechFrameDisplay, enableLedgeTechFramesOnLedgePopup, enableLedgeTechAirdodgeAngle,
+        cpuTechOption
     );
 }
 
