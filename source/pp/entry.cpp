@@ -7,6 +7,7 @@
 #include "pp/global_settings.h"
 #include "pp/invis_techs.h"
 #include "pp/frame_advance.h"
+#include "pp/cpu_tech.h"
 #include "gf/gf_pad_status.h"
 #include "memory.h"
 
@@ -31,6 +32,7 @@ void Init(CoreApi* syriinge) {
     syriinge->sySimpleHook(0x8002e5b0, pauseHook);
     syriinge->sySimpleHookRel(0x5afb4, PP::invisTechsMainHook, 27);
     syriinge->sySimpleHookRel(0x12fee4, PP::invisTechsCursorHook, 27);
+    syriinge->syReplaceFuncRel(0x8C500, (void*)PP::techValueHook, (void**)&PP::techValueOriginal, 27);
     // SyringeCore::sySimpleHookRel(0x12ff78, PP::invisTechsCursorHook, 27);
     // SyringeCore::sySimpleHookRel(0x12ffD4, PP::invisTechsNameCursorHook, 27);
 }

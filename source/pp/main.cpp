@@ -22,6 +22,7 @@
 #include "pp/anim_cmd_watcher.h"
 #include "pp/status_change_watcher.h"
 #include "pp/ledge_tech.h"
+#include "pp/cpu_tech.h"
 #include "pp/graphics/watermark.h"
 
 using namespace PP::Graphics;
@@ -248,6 +249,10 @@ void updateBattleScene() {
     g_watermark.process();
 
     if (PP_IS_PAUSED) { return; }
+
+    for (idx = 0; idx < fighterCount; idx++) {
+        processCpuTech(allPlayerData[idx]);
+    }
 
     /* Clean up and prepare for the next frame. */
     for (idx = 0; idx < fighterCount; idx++) {

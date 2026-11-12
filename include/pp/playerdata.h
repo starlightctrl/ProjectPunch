@@ -8,6 +8,7 @@
 
 #include "pp/actions.h"
 #include "pp/common.h"
+#include "pp/cpu_tech.h"
 #include "pp/popup.h"
 #include "pp/playerdata_on_frame.h"
 
@@ -61,6 +62,7 @@ struct PlayerData {
     LedgeTechWatcher* ledgeTechWatcher;
 
     bool isCpu;
+    CpuTechState cpuTechState;
 
     /* aliases for fields on Current*/
     u16 action() const;
