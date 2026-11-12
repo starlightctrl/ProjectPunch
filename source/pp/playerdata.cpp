@@ -37,6 +37,7 @@ PlayerData::PlayerData() {
     animCmdWatcher = NULL;
     statusChangeWatcher = NULL;
     ledgeTechWatcher = NULL;
+    isCpu = false;
 
     charId = Fighter_Mario;
     taskId = -1;

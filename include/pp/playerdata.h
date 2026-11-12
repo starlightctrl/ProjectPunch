@@ -60,6 +60,8 @@ struct PlayerData {
     StatusChangeWatcher* statusChangeWatcher;
     LedgeTechWatcher* ledgeTechWatcher;
 
+    bool isCpu;
+
     /* aliases for fields on Current*/
     u16 action() const;
     const char* actionStr() const;

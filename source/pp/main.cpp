@@ -143,6 +143,7 @@ bool initializePlayer(u8 playerEntryIdx) {
     int muCharKind = muMenu::exchangeGmCharacterKind2MuStockchkind(entry->m_characterKind);
     playerData.fighterName = muMenu::exchangeMuStockchkind2MuCharName(muCharKind);
     playerData.playerNumber = playerNumber;
+    playerData.isCpu = opType != 0;
 
     OSReport("Initializing P%d: %s\n", playerNumber, playerData.fighterName);
 
